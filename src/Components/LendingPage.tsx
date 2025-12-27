@@ -38,6 +38,20 @@ export default function LendingPage() {
         if (mode === 'BUY') presale.buyTokens(amount, referrer);
         else presale.sellTokens(amount);
     };
+    const onAmountChange = (value: string) => {
+        // Allow empty (so user can delete)
+        if (value === '') {
+            setAmount('');
+            return;
+        }
+
+        // Regex: only positive numbers with optional decimal
+        const valid = /^\d*\.?\d*$/.test(value);
+
+        if (!valid) return;
+
+        setAmount(value);
+    };
 
     const progress = (parseFloat(presale.phaseSold) / parseFloat(presale.phaseCap)) * 100 || 0;
     const balance = mode === 'BUY' ? parseFloat(presale.usdtBalance).toFixed(2) : parseFloat(presale.dmxBalance).toFixed(2);
@@ -223,12 +237,14 @@ export default function LendingPage() {
                                         </div>
                                         <div className="d-flex align-items-center justify-content-between">
                                             <input
-                                                type="number"
+                                                type="text"
+                                                inputMode="decimal"
                                                 placeholder="0"
                                                 value={amount}
-                                                onChange={(e) => setAmount(e.target.value)}
+                                                onChange={(e) => onAmountChange(e.target.value)}
                                                 className="bg-transparent border-0 text-white fw-bold fs-4 w-75 p-0 shadow-none form-control-plaintext"
                                             />
+
                                             <Badge bg="dark" className="d-flex align-items-center gap-2 px-2 py-1 rounded-pill border border-secondary border-opacity-25 text-white" style={{ fontSize: '0.8rem' }}>
                                                 <img src={mode === 'BUY' ? USDT_LOGO : LOGO_URL} width="16" alt="Icon" />
                                                 {mode === 'BUY' ? 'USDT' : 'DMX'}
