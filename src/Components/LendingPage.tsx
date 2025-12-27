@@ -39,13 +39,11 @@ export default function LendingPage() {
         else presale.sellTokens(amount);
     };
     const onAmountChange = (value: string) => {
-        // Allow empty (so user can delete)
         if (value === '') {
             setAmount('');
             return;
         }
 
-        // Regex: only positive numbers with optional decimal
         const valid = /^\d*\.?\d*$/.test(value);
 
         if (!valid) return;
@@ -284,7 +282,7 @@ export default function LendingPage() {
                                     {mode === 'BUY' && (
                                         <div className="mb-4">
                                             <div className="d-flex align-items-center gap-1 text-secondary small mb-2">
-                                                <span>Referral Code (Optional)</span>
+                                                <span>Referral Address (Optional)</span>
                                             </div>
                                             <Form.Control
                                                 type="text"
