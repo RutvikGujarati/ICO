@@ -10,6 +10,9 @@ export interface PresaleState {
     phaseSold: string;
     phaseCap: string;
     dmxBalance: string;
+    headline: string;
+    registeredEmail: string;
+    emailLoading: boolean;
     usdtBalance: string;
     bnbBalance: string;
     maxBuy: string;
@@ -23,6 +26,9 @@ const initialState: PresaleState = {
     currentPhase: 1,
     currentPrice: "0",
     phaseSold: "0",
+    emailLoading: false,
+    registeredEmail: "",
+    headline: "",
     phaseCap: "0",
     dmxBalance: "0",
     usdtBalance: "0",
@@ -70,22 +76,21 @@ export const usePresale = () => {
     const refreshData = useCallback(async (currProv: BrowserProvider, currAcc: string) => {
         try {
             const net = await currProv.getNetwork();
-            if (net.chainId !== BigInt(97)) {
-                console.warn("Wrong Network");
-                return;
-            }
+            if (net.chainId !== BigInt(97)) return;
 
             const presale = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, currProv);
             const dmx = new Contract(CONFIG.DMX_ADDRESS, ABIS.ERC20, currProv);
             const usdt = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, currProv);
 
-            const [idx, maxBuy] = await Promise.all([presale.currentPhaseIndex(), presale.maxBuyAmount()]);
+            const idx = await presale.currentPhaseIndex();
             const phase = await presale.phases(idx);
 
-            const [dmxBal, usdtBal, bnbBal] = await Promise.all([
+            const [dmxBal, usdtBal, bnbBal, headline, email] = await Promise.all([
                 dmx.balanceOf(currAcc),
                 usdt.balanceOf(currAcc),
-                currProv.getBalance(currAcc)
+                currProv.getBalance(currAcc),
+                presale.newsHeadline(),          // ✅
+                presale.userEmails(currAcc)      // ✅
             ]);
 
             setState(p => ({
@@ -96,15 +101,40 @@ export const usePresale = () => {
                 currentPrice: formatUnits(phase.price, 18),
                 phaseSold: formatUnits(phase.sold, 18),
                 phaseCap: formatUnits(phase.totalCap, 18),
-                maxBuy: formatUnits(maxBuy, 18),
                 dmxBalance: formatUnits(dmxBal, 18),
                 usdtBalance: formatUnits(usdtBal, 18),
-                bnbBalance: formatEther(bnbBal)
+                bnbBalance: formatEther(bnbBal),
+                headline,
+                registeredEmail: email           // ✅
             }));
         } catch (e) {
-            console.error("Fetch Data Error:", e);
+            console.error(e);
         }
     }, []);
+
+
+    const registerEmail = async (email: string) => {
+        if (!signer || !state.account) return alert("Connect Wallet");
+
+        setState(p => ({ ...p, emailLoading: true }));
+
+        try {
+            const presale = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, signer);
+            const tx = await presale.registerEmail(email);
+            await tx.wait();
+
+            setState(p => ({
+                ...p,
+                registeredEmail: email   // ✅ instantly hide input
+            }));
+
+            alert("Email registered successfully");
+        } catch (e: any) {
+            alert(e.reason || e.message);
+        } finally {
+            setState(p => ({ ...p, emailLoading: false }));
+        }
+    };
 
     const connectWallet = async () => {
         if (!(window as any).ethereum) return alert("Install MetaMask");
@@ -156,44 +186,44 @@ export const usePresale = () => {
         };
     }, []);
 
- const buyTokens = async (usdtAmount: string, referrer: string) => {
-    if (!signer || !state.account) return alert("Connect Wallet");
-    setState(prev => ({ ...prev, loading: true }));
-    
-    try {
-      const usdtContract = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, signer);
-      const presaleContract = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, signer);
+    const buyTokens = async (usdtAmount: string, referrer: string, email: string) => {
+        if (!signer || !state.account) return alert("Connect Wallet");
+        setState(prev => ({ ...prev, loading: true }));
 
-      const price = parseFloat(state.currentPrice) || 1;
-      const dmxAmountNum = parseFloat(usdtAmount) / price;
-      
-      const usdtWei = parseUnits(usdtAmount, 18);
-      const dmxWei = parseUnits(dmxAmountNum.toFixed(18), 18);
-      const refAddress = referrer && referrer.length === 42 ? referrer : ZeroAddress;
+        try {
+            const usdtContract = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, signer);
+            const presaleContract = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, signer);
 
-      // --- CHECK ALLOWANCE ---
-      const allowance = await usdtContract.allowance(state.account, CONFIG.PRESALE_ADDRESS);
-      
-      if (allowance < usdtWei) {
-        console.log("Approving Infinite USDT...");
-        // Approve MaxUint256 (Infinite) instead of just usdtWei
-        const txApprove = await usdtContract.approve(CONFIG.PRESALE_ADDRESS, MaxUint256);
-        await txApprove.wait();
-        console.log("Approval Confirmed");
-      }
+            const price = parseFloat(state.currentPrice) || 1;
+            const dmxAmountNum = parseFloat(usdtAmount) / price;
 
-      // --- EXECUTE BUY ---
-      const txBuy = await presaleContract.buyTokens(dmxWei, refAddress);
-      await txBuy.wait();
-      
-      alert("Purchase Successful");
-      if (provider && state.account) await refreshData(provider, state.account);
-    } catch (err: any) {
-      alert(err.reason || err.message);
-    } finally {
-      setState(prev => ({ ...prev, loading: false }));
-    }
-  };
+            const usdtWei = parseUnits(usdtAmount, 18);
+            const dmxWei = parseUnits(dmxAmountNum.toFixed(18), 18);
+            const refAddress = referrer && referrer.length === 42 ? referrer : ZeroAddress;
+
+            // --- CHECK ALLOWANCE ---
+            const allowance = await usdtContract.allowance(state.account, CONFIG.PRESALE_ADDRESS);
+
+            if (allowance < usdtWei) {
+                console.log("Approving Infinite USDT...");
+                // Approve MaxUint256 (Infinite) instead of just usdtWei
+                const txApprove = await usdtContract.approve(CONFIG.PRESALE_ADDRESS, MaxUint256);
+                await txApprove.wait();
+                console.log("Approval Confirmed");
+            }
+
+            // --- EXECUTE BUY ---
+            const txBuy = await presaleContract.buyTokens(dmxWei, refAddress, email || "");
+            await txBuy.wait();
+
+            alert("Purchase Successful");
+            if (provider && state.account) await refreshData(provider, state.account);
+        } catch (err: any) {
+            alert(err.reason || err.message);
+        } finally {
+            setState(prev => ({ ...prev, loading: false }));
+        }
+    };
     const sellTokens = async (dmxAmt: string) => {
         if (!signer || !state.account) return alert("Connect Wallet");
         setState(p => ({ ...p, loading: true }));
@@ -220,5 +250,5 @@ export const usePresale = () => {
         }
     };
 
-    return { ...state, connectWallet, disconnectWallet, buyTokens, sellTokens };
+    return { ...state, connectWallet, disconnectWallet, buyTokens, sellTokens, registerEmail };
 };

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { Container, Navbar, Nav, Button, Card, Row, Col, ProgressBar, Form, Badge, Dropdown, Spinner } from 'react-bootstrap';
+import { Container, Navbar, Nav, Button, Card, Row, Col, ProgressBar, Form, Badge, Dropdown, Spinner, Alert } from 'react-bootstrap';
 import { usePresale } from '../hooks/usePresale';
 import TokenomicsSection from './Tokonomics';
 import PhasesSection from './Phases';
+import { isValidEmail } from '../config';
 
 const Icons = {
     Wallet: () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a2 2 0 0 1-2-2V7ad2 2 0 0 1 2-2h3M16 14h.01" /></svg>,
@@ -22,7 +23,10 @@ export default function LendingPage() {
     const [amount, setAmount] = useState("");
     const [referrer, setReferrer] = useState("");
     const [output, setOutput] = useState("");
-
+    const [email, setEmail] = useState("");
+    const isFirstBuy = presale.account && !presale.registeredEmail;
+    const isEmailValid =
+        !isFirstBuy || isValidEmail(email);
     useEffect(() => {
         if (!amount) { setOutput(""); return; }
         const price = parseFloat(presale.currentPrice) || 1;
@@ -35,7 +39,7 @@ export default function LendingPage() {
     }, [amount, mode, presale.currentPrice]);
 
     const handleAction = () => {
-        if (mode === 'BUY') presale.buyTokens(amount, referrer);
+        if (mode === 'BUY') presale.buyTokens(amount, referrer, email || "");
         else presale.sellTokens(amount);
     };
     const onAmountChange = (value: string) => {
@@ -131,6 +135,36 @@ export default function LendingPage() {
                         </Navbar.Collapse>
                     </Container>
                 </Navbar>
+                {presale.headline && (
+                    <Alert
+                        variant="info"
+                        className="py-2 px-3 rounded-pill small fw-semibold shadow-sm mb-3"
+                    >
+                        <div
+                            style={{
+                                overflow: 'hidden',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            <div
+                                style={{
+                                    display: 'inline-block',
+                                    paddingLeft: '100%',
+                                    animation: 'scroll-left 20s linear infinite',
+                                }}
+                            >
+                                {presale.headline}
+                            </div>
+                            <style>{`
+                                @keyframes scroll-left {
+                                    0% { transform: translateX(0); }
+                                    100% { transform: translateX(-100%); }
+                                }
+                            `}</style>
+                        </div>
+                    </Alert>
+                )}
+
 
                 <Container className="py-5">
                     <Row className="justify-content-center align-items-start min-vh-75 py-lg-5">
@@ -293,21 +327,60 @@ export default function LendingPage() {
                                             />
                                         </div>
                                     )}
+                                    {presale.account && presale.registeredEmail && mode === 'BUY' && (
+                                        <div className="alert alert-success py-2 small rounded-4 mb-3">
+                                            Email Already registered: <strong>{presale.registeredEmail}</strong>
+                                        </div>
+                                    )}
+
+                                    {presale.account && !presale.registeredEmail && mode === 'BUY' && (
+                                        <div className="mb-3">
+                                            <div className="d-flex justify-content-between mb-1">
+                                                <span className="text-secondary small fw-semibold">
+                                                    Email <span className="text-danger">*</span>
+                                                </span>
+                                                <span className="text-warning small">
+                                                    Required for first purchase
+                                                </span>
+                                            </div>
+
+                                            <Form.Control
+                                                type="email"
+                                                placeholder="you@example.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="bg-black bg-opacity-25 border border-white border-opacity-10 text-white placeholder-opacity-50 rounded-4"
+                                                required
+                                                isInvalid={email.length > 0 && !isEmailValid}
+                                            />
+                                        </div>
+                                    )}
                                     <Button
                                         variant={mode === 'BUY' ? 'info' : 'warning'}
                                         size="lg"
-                                        disabled={presale.loading || !presale.account}
-                                        className={`w-100 fw-bold py-2 rounded-4 shadow-lg text-white border-0 ${mode === 'BUY' ? 'bg-gradient-info' : ''}`}
+                                        disabled={
+                                            Boolean(presale.loading ||
+                                                !presale.account ||
+                                                (mode === 'BUY' && isFirstBuy && !isEmailValid))
+                                        }
+                                        className={`w-100 fw-bold py-2 rounded-4 shadow-lg text-white border-0 ${mode === 'BUY' ? 'bg-gradient-info' : ''
+                                            }`}
                                         onClick={handleAction}
                                     >
                                         {presale.loading ? (
                                             <>
-                                                <Spinner animation="border" size="sm" /> Processing...
+                                                <Spinner animation="border" size="sm" className="me-2" />
+                                                Processing...
                                             </>
+                                        ) : !presale.account ? (
+                                            'Connect Wallet First'
+                                        ) : mode === 'BUY' ? (
+                                            isFirstBuy ? 'Buy & Register Email' : 'Buy Now'
                                         ) : (
-                                            presale.account ? (mode === 'BUY' ? 'Buy Now' : 'Sell Back') : 'Connect Wallet First'
+                                            'Sell Back'
                                         )}
                                     </Button>
+
                                 </Card.Body>
                             </Card>
 
