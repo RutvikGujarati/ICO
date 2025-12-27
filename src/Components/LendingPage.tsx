@@ -39,10 +39,6 @@ export default function LendingPage() {
         else presale.sellTokens(amount);
     };
 
-    const handleDisconnect = () => {
-        window.location.reload();
-    };
-
     const progress = (parseFloat(presale.phaseSold) / parseFloat(presale.phaseCap)) * 100 || 0;
     const balance = mode === 'BUY' ? parseFloat(presale.usdtBalance).toFixed(2) : parseFloat(presale.dmxBalance).toFixed(2);
 
@@ -114,7 +110,7 @@ export default function LendingPage() {
                                                 <span className="fw-bold text-white">{parseFloat(presale.bnbBalance).toFixed(4)} BNB</span>
                                             </div>
                                         </div>
-                                        <Dropdown.Item onClick={handleDisconnect} className="text-danger rounded-3 d-flex align-items-center gap-2 hover-bg-secondary">
+                                        <Dropdown.Item onClick={presale.disconnectWallet} className="text-danger rounded-3 d-flex align-items-center gap-2 hover-bg-secondary">
                                             <Icons.Power /> Disconnect
                                         </Dropdown.Item>
                                     </Dropdown.Menu>
