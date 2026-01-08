@@ -17,8 +17,8 @@ const LOGO_URL = "./dmx.png";
 const USDT_LOGO = "https://cryptologos.cc/logos/tether-usdt-logo.png";
 const BG_IMAGE_URL = "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?q=80&w=2552";
 
-export default function LendingPage() {
-    const presale = usePresale();
+export default function LendingPage({ toast }: { toast: any }) {
+    const presale = usePresale(toast);
     const [mode, setMode] = useState('BUY'); // 'BUY' | 'SELL'
     const [amount, setAmount] = useState("");
     const [referrer, setReferrer] = useState("");
@@ -36,11 +36,17 @@ export default function LendingPage() {
         } else {
             setOutput((val * price * 0.85).toFixed(4));
         }
-    }, [amount, mode, presale.currentPrice]);
+    }, [amount, mode, presale.currentPrice,
+        presale.usdtBalance,
+        presale.dmxBalance
+    ]);
 
     const handleAction = () => {
         if (mode === 'BUY') presale.buyTokens(amount, referrer, email || "");
         else presale.sellTokens(amount);
+
+        setAmount("");
+        setOutput("");
     };
     const onAmountChange = (value: string) => {
         if (value === '') {
@@ -107,7 +113,7 @@ export default function LendingPage() {
                                     >
                                         <div className="d-flex align-items-center gap-2">
                                             <div className="bg-success rounded-circle" style={{ width: 8, height: 8 }}></div>
-                                            <span className="small fw-bold text-info">BSC Testnet</span>
+                                            <span className="small fw-bold text-info">BSC Mainnet</span>
                                         </div>
                                         <div className="vr mx-2 bg-secondary"></div>
                                         <span className="small fw-bold">{presale.account.substring(0, 6)}...{presale.account.substring(38)}</span>
