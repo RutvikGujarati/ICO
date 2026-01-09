@@ -106,7 +106,8 @@ export default function LendingPage({ toast }: { toast: any }) {
                             <div className="d-flex align-items-center justify-content-lg-end gap-3" style={{ minWidth: '200px' }}>
                                 {!presale.account ? (
                                     <div className="custom-w3m-button">
-                                        <w3m-button balance="hide" label="Connect Wallet" />
+                                        {/* @ts-ignore */}
+                                        <w3m-button label="Connect Wallet" />
                                     </div>
                                 ) : (
                                     <div className="d-flex align-items-center gap-2">
