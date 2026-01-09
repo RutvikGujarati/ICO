@@ -13,15 +13,19 @@ const bsc = {
 const metadata = {
   name: 'Dominix Presale',
   description: 'Dominix Presale Protocol',
-  url: 'https://dominix.io',
-  icons: ['https://avatars.mywebsite.com/']
+  url: 'https://dominix.cloud',
+  icons: ['https://avatars.dominix.com/'],
+  redirect: {
+    native: 'dominix://', 
+    universal: 'https://dominix.cloud'
+  }
 }
 
 const ethersConfig = defaultConfig({
   metadata,
   enableEIP6963: true,
   enableInjected: true,
-  enableCoinbase: false, // Disables Coinbase
+  enableCoinbase: false,
   defaultChainId: 56
 })
 

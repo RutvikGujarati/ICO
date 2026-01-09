@@ -69,6 +69,8 @@ export const usePresale = (toast?: ToastFn) => {
 
     useEffect(() => {
         if (isConnected && walletProvider) {
+            setState(p => ({ ...p, connecting: false }));
+
             const ethersProvider = new BrowserProvider(walletProvider);
             setProvider(ethersProvider);
 
@@ -81,7 +83,7 @@ export const usePresale = (toast?: ToastFn) => {
         } else {
             setProvider(null);
             setSigner(null);
-            setState(initialState);
+            setState(({ ...initialState, connecting: false }));
         }
     }, [isConnected, walletProvider, address, chainId]);
 
@@ -106,11 +108,9 @@ export const usePresale = (toast?: ToastFn) => {
                             }]);
                             return;
                         } catch (addError) {
-                            console.error("Failed to add network", addError);
+                            console.error(addError);
                         }
                     }
-                    console.error("Failed to switch network", switchError);
-
                     return;
                 }
             }
@@ -120,9 +120,9 @@ export const usePresale = (toast?: ToastFn) => {
             const usdt = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, currProv);
 
             const idx = await presale.currentPhaseIndex();
-            const phase = await presale.phases(idx);
 
-            const [dmxBal, usdtBal, bnbBal, headline, email] = await Promise.all([
+            const [phase, dmxBal, usdtBal, bnbBal, headline, email] = await Promise.all([
+                presale.phases(idx),
                 dmx.balanceOf(currAcc).catch(() => 0n),
                 usdt.balanceOf(currAcc).catch(() => 0n),
                 currProv.getBalance(currAcc).catch(() => 0n),
@@ -143,11 +143,10 @@ export const usePresale = (toast?: ToastFn) => {
                 bnbBalance: formatEther(bnbBal),
                 headline,
                 registeredEmail: email,
-                connecting: false 
+                loading: false
             }));
         } catch (e) {
-            console.error("Error refreshing data:", e);
-            setState(p => ({ ...p, connecting: false }));
+            console.error(e);
         }
     }, []);
 
@@ -158,10 +157,6 @@ export const usePresale = (toast?: ToastFn) => {
         } catch (e) {
             console.error(e);
             setState(p => ({ ...p, connecting: false }));
-        } finally {
-            setTimeout(() => {
-                if (!isConnected) setState(p => ({ ...p, connecting: false }));
-            }, 1000);
         }
     };
 
@@ -173,7 +168,7 @@ export const usePresale = (toast?: ToastFn) => {
             setState(initialState);
             toast?.("Wallet disconnected", "info");
         } catch (error) {
-            console.error("Disconnect failed:", error);
+            console.error(error);
         }
     };
 
@@ -200,14 +195,8 @@ export const usePresale = (toast?: ToastFn) => {
     };
 
     const buyTokens = async (usdtAmount: string, referrer: string, email: string) => {
-        if (!isValidAmount(usdtAmount)) {
-            toast?.("Please enter a valid amount", "error");
-            return;
-        }
-        if (!signer || !provider) {
-            toast?.("Connect wallet first", "error");
-            return;
-        }
+        if (!isValidAmount(usdtAmount)) return toast?.("Please enter a valid amount", "error");
+        if (!signer || !provider) return toast?.("Connect wallet first", "error");
 
         const account = await signer.getAddress();
         setState(p => ({ ...p, loading: true }));
@@ -229,27 +218,28 @@ export const usePresale = (toast?: ToastFn) => {
             }
 
             const tx = await presale.buyTokens(dmxWei, ref, email || "");
+
             await tx.wait();
 
             await refreshData(provider, account);
             toast?.("Purchase successful", "success");
+
         } catch (e: any) {
             console.error(e);
-            toast?.(e.reason || e.message || "Transaction failed", "error");
+            if (e.message.includes("user rejected") || e.code === 4001) {
+                toast?.("Transaction rejected by user", "info");
+            } else {
+                toast?.(e.reason || e.message || "Transaction failed", "error");
+            }
         } finally {
             setState(p => ({ ...p, loading: false }));
         }
     };
 
     const sellTokens = async (dmxAmt: string) => {
-        if (!signer || !provider) {
-            toast?.("Connect wallet first", "error");
-            return;
-        }
-        if (!isValidAmount(dmxAmt)) {
-            toast?.("Please enter a valid amount", "error");
-            return;
-        }
+        if (!isValidAmount(dmxAmt)) return toast?.("Please enter a valid amount", "error");
+        if (!signer || !provider) return toast?.("Connect wallet first", "error");
+
         const account = await signer.getAddress();
         setState(p => ({ ...p, loading: true }));
 
@@ -272,7 +262,11 @@ export const usePresale = (toast?: ToastFn) => {
             toast?.("Tokens sold successfully", "success");
         } catch (e: any) {
             console.error(e);
-            toast?.(e.reason || e.message || "Transaction failed", "error");
+            if (e.message.includes("user rejected") || e.code === 4001) {
+                toast?.("Transaction rejected", "info");
+            } else {
+                toast?.(e.reason || e.message, "error");
+            }
         } finally {
             setState(p => ({ ...p, loading: false }));
         }
