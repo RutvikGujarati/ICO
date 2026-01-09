@@ -9,7 +9,7 @@ import {
     formatEther,
     MaxUint256
 } from 'ethers';
-import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider ,useDisconnect} from '@web3modal/ethers/react';
+import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider, useDisconnect } from '@web3modal/ethers/react';
 import { CONFIG, ABIS } from '../config';
 
 export interface PresaleState {
@@ -52,9 +52,9 @@ type ToastFn = (msg: string, type?: 'success' | 'error' | 'info') => void;
 
 export const usePresale = (toast?: ToastFn) => {
     const { open } = useWeb3Modal();
-    const { disconnect } = useDisconnect();
-    const { address, isConnected } = useWeb3ModalAccount();
+    const { address, isConnected, chainId } = useWeb3ModalAccount();
     const { walletProvider } = useWeb3ModalProvider();
+    const { disconnect } = useDisconnect();
 
     const [state, setState] = useState<PresaleState>(initialState);
     const [provider, setProvider] = useState<BrowserProvider | null>(null);
@@ -83,11 +83,38 @@ export const usePresale = (toast?: ToastFn) => {
             setSigner(null);
             setState(initialState);
         }
-    }, [isConnected, walletProvider, address]);
+    }, [isConnected, walletProvider, address, chainId]);
 
     const refreshData = useCallback(async (currProv: BrowserProvider, currAcc: string) => {
         try {
             const net = await currProv.getNetwork();
+            const currentChainId = net.chainId;
+
+            if (currentChainId !== BigInt(56)) {
+                try {
+                    await currProv.send("wallet_switchEthereumChain", [{ chainId: "0x38" }]);
+                    return;
+                } catch (switchError: any) {
+                    if (switchError.code === 4902) {
+                        try {
+                            await currProv.send("wallet_addEthereumChain", [{
+                                chainId: "0x38",
+                                chainName: "BNB Smart Chain",
+                                nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+                                rpcUrls: ["https://binance.llamarpc.com"],
+                                blockExplorerUrls: ["https://bscscan.com"]
+                            }]);
+                            return;
+                        } catch (addError) {
+                            console.error("Failed to add network", addError);
+                        }
+                    }
+                    console.error("Failed to switch network", switchError);
+
+                    return;
+                }
+            }
+
             const presale = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, currProv);
             const dmx = new Contract(CONFIG.DMX_ADDRESS, ABIS.ERC20, currProv);
             const usdt = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, currProv);
@@ -96,17 +123,17 @@ export const usePresale = (toast?: ToastFn) => {
             const phase = await presale.phases(idx);
 
             const [dmxBal, usdtBal, bnbBal, headline, email] = await Promise.all([
-                dmx.balanceOf(currAcc),
-                usdt.balanceOf(currAcc),
-                currProv.getBalance(currAcc),
-                presale.newsHeadline(),
-                presale.userEmails(currAcc)
+                dmx.balanceOf(currAcc).catch(() => 0n),
+                usdt.balanceOf(currAcc).catch(() => 0n),
+                currProv.getBalance(currAcc).catch(() => 0n),
+                presale.newsHeadline().catch(() => ""),
+                presale.userEmails(currAcc).catch(() => "")
             ]);
 
             setState(p => ({
                 ...p,
                 account: currAcc,
-                chainId: net.chainId,
+                chainId: currentChainId,
                 currentPhase: Number(idx) + 1,
                 currentPrice: formatUnits(phase.price, 18),
                 phaseSold: formatUnits(phase.sold, 18),
@@ -115,23 +142,25 @@ export const usePresale = (toast?: ToastFn) => {
                 usdtBalance: formatUnits(usdtBal, 18),
                 bnbBalance: formatEther(bnbBal),
                 headline,
-                registeredEmail: email
+                registeredEmail: email,
+                connecting: false 
             }));
         } catch (e) {
             console.error("Error refreshing data:", e);
+            setState(p => ({ ...p, connecting: false }));
         }
     }, []);
 
     const connectWallet = async () => {
         setState(p => ({ ...p, connecting: true }));
-
         try {
             await open();
         } catch (e) {
             console.error(e);
+            setState(p => ({ ...p, connecting: false }));
         } finally {
             setTimeout(() => {
-                setState(p => ({ ...p, connecting: false }));
+                if (!isConnected) setState(p => ({ ...p, connecting: false }));
             }, 1000);
         }
     };
@@ -147,6 +176,7 @@ export const usePresale = (toast?: ToastFn) => {
             console.error("Disconnect failed:", error);
         }
     };
+
     const registerEmail = async (email: string) => {
         if (!signer || !state.account) {
             toast?.("Connect wallet first", "error");

@@ -74,6 +74,7 @@ export default function LendingPage({ toast }: { toast: any }) {
             <div className="position-relative z-1">
                 <Navbar expand="lg" variant="dark" className="py-3 bg-dark bg-opacity-75 border-bottom border-secondary border-opacity-25 sticky-top backdrop-blur">
                     <Container>
+                        {/* LEFT: Logo */}
                         <Navbar.Brand className="d-flex align-items-center gap-2 fw-bold fs-4 me-0" style={{ minWidth: '200px' }}>
                             <img src={LOGO_URL} alt="Dominix" width="40" height="40" className="object-fit-contain" />
                             <span className="text-info tracking-wider">DOMINIX</span>
@@ -82,32 +83,37 @@ export default function LendingPage({ toast }: { toast: any }) {
                         <Navbar.Toggle aria-controls="basic-navbar-nav" />
 
                         <Navbar.Collapse id="basic-navbar-nav">
+                            {/* CENTER: Navigation Links */}
                             <Nav className="mx-auto my-2 my-lg-0">
                                 <Nav.Link href="#" className="text-white mx-3 fw-semibold">Swap</Nav.Link>
                                 <Nav.Link href="#phases" className="text-white-50 mx-3">Phases</Nav.Link>
                                 <Nav.Link href="#tokenomics" className="text-white-50 mx-3">Tokenomics</Nav.Link>
                             </Nav>
 
+                            {/* RIGHT: Wallet Connection */}
                             <div className="d-flex align-items-center justify-content-lg-end gap-3" style={{ minWidth: '200px' }}>
                                 {!presale.account ? (
                                     <Button
                                         variant="dark"
                                         onClick={presale.connectWallet}
                                         disabled={presale.connecting}
-                                        className="d-flex align-items-center gap-2 rounded-pill px-4 border border-secondary bg-white bg-opacity-10"
+                                        className="d-flex align-items-center gap-2 rounded-pill px-4 border border-secondary bg-white bg-opacity-10 transition-all hover-scale"
                                     >
                                         {presale.connecting ? (
                                             <>
-                                                <Spinner animation="border" size="sm" /> Connecting...
+                                                <Spinner animation="border" size="sm" />
+                                                <span className="ms-2">Connecting...</span>
                                             </>
                                         ) : (
                                             <>
-                                                <Icons.Wallet /> Connect Wallet
+                                                <Icons.Wallet />
+                                                <span>Connect Wallet</span>
                                             </>
                                         )}
                                     </Button>
                                 ) : (
                                     <div className="d-flex align-items-center gap-3">
+                                        {/* Desktop Balance Display */}
                                         <div className="d-none d-lg-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-black bg-opacity-25 border border-white border-opacity-10">
                                             <img src={LOGO_URL} width="20" height="20" alt="DMX" />
                                             <div className="d-flex flex-column lh-1">
@@ -116,7 +122,8 @@ export default function LendingPage({ toast }: { toast: any }) {
                                             </div>
                                         </div>
 
-                                        <Dropdown>
+                                        {/* Account Dropdown */}
+                                        <Dropdown align={{ lg: 'end' }}> {/* FIX: Only align end on desktop, default on mobile */}
                                             <Dropdown.Toggle
                                                 variant="dark"
                                                 className="d-flex align-items-center gap-2 rounded-pill px-3 py-2 border border-info border-opacity-25 bg-info bg-opacity-10 text-white"
@@ -129,13 +136,13 @@ export default function LendingPage({ toast }: { toast: any }) {
                                                 <span className="small fw-bold">{presale.account.substring(0, 6)}...</span>
                                             </Dropdown.Toggle>
 
-                                            <Dropdown.Menu align="end" className="shadow-lg rounded-4 p-3 bg-dark border border-secondary border-opacity-25" style={{ minWidth: '260px' }}>
+                                            <Dropdown.Menu className="shadow-lg rounded-4 p-3 bg-dark border border-secondary border-opacity-25" style={{ minWidth: '260px', marginTop: '10px' }}>
                                                 <div className="d-flex align-items-center gap-2 mb-3 px-2">
                                                     <Icons.Globe />
                                                     <span className="small text-white-50">Connected to BSC Mainnet</span>
                                                 </div>
 
-                                                {/* Mobile/Dropdown DMX Display */}
+                                                {/* Mobile Balance Display inside Menu */}
                                                 <div className="bg-info bg-opacity-10 rounded-3 p-2 mb-2 border border-info border-opacity-25">
                                                     <div className="d-flex justify-content-between text-info small mb-1">
                                                         <span className="fw-bold">Your Holdings</span>
