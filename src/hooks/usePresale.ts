@@ -9,6 +9,7 @@ import {
     formatEther,
     MaxUint256
 } from 'ethers';
+import { useWeb3Modal, useWeb3ModalAccount, useWeb3ModalProvider ,useDisconnect} from '@web3modal/ethers/react';
 import { CONFIG, ABIS } from '../config';
 
 export interface PresaleState {
@@ -49,15 +50,15 @@ const initialState: PresaleState = {
 
 type ToastFn = (msg: string, type?: 'success' | 'error' | 'info') => void;
 
-// Helper to detect mobile devices
-const isMobileDevice = () => {
-    return 'ontouchstart' in window || /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
-};
-
 export const usePresale = (toast?: ToastFn) => {
+    const { open } = useWeb3Modal();
+    const { disconnect } = useDisconnect();
+    const { address, isConnected } = useWeb3ModalAccount();
+    const { walletProvider } = useWeb3ModalProvider();
+
+    const [state, setState] = useState<PresaleState>(initialState);
     const [provider, setProvider] = useState<BrowserProvider | null>(null);
     const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
-    const [state, setState] = useState<PresaleState>(initialState);
 
     const isValidAmount = (value: string) => {
         if (!value) return false;
@@ -66,46 +67,27 @@ export const usePresale = (toast?: ToastFn) => {
         return Number.isFinite(n) && n > 0;
     };
 
-    const switchNetwork = async () => {
-        if (!(window as any).ethereum) {
-            toast?.("Please install MetaMask", "error");
-            return false;
-        }
-        try {
-            await (window as any).ethereum.request({
-                method: 'wallet_switchEthereumChain',
-                params: [{ chainId: '0x38' }],
-            });
-            return true;
-        } catch (error: any) {
-            if (error.code === 4902) {
-                try {
-                    await (window as any).ethereum.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [{
-                            chainId: '0x38',
-                            chainName: 'BNB Smart Chain Mainnet',
-                            nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
-                            rpcUrls: ['https://public-bsc-mainnet.fastnode.io'],
-                            blockExplorerUrls: ['https://bscscan.com/']
-                        }],
-                    });
-                    return true;
-                } catch {
-                    toast?.("Failed to add BSC network", "error");
-                    return false;
+    useEffect(() => {
+        if (isConnected && walletProvider) {
+            const ethersProvider = new BrowserProvider(walletProvider);
+            setProvider(ethersProvider);
+
+            ethersProvider.getSigner().then((newSigner) => {
+                setSigner(newSigner);
+                if (address) {
+                    refreshData(ethersProvider, address);
                 }
-            }
-            toast?.("Network switch rejected", "error");
-            return false;
+            });
+        } else {
+            setProvider(null);
+            setSigner(null);
+            setState(initialState);
         }
-    };
+    }, [isConnected, walletProvider, address]);
 
     const refreshData = useCallback(async (currProv: BrowserProvider, currAcc: string) => {
         try {
             const net = await currProv.getNetwork();
-            if (net.chainId !== BigInt(56)) return;
-
             const presale = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, currProv);
             const dmx = new Contract(CONFIG.DMX_ADDRESS, ABIS.ERC20, currProv);
             const usdt = new Contract(CONFIG.USDT_ADDRESS, ABIS.ERC20, currProv);
@@ -136,10 +118,35 @@ export const usePresale = (toast?: ToastFn) => {
                 registeredEmail: email
             }));
         } catch (e) {
-            console.error(e);
+            console.error("Error refreshing data:", e);
         }
     }, []);
 
+    const connectWallet = async () => {
+        setState(p => ({ ...p, connecting: true }));
+
+        try {
+            await open();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setTimeout(() => {
+                setState(p => ({ ...p, connecting: false }));
+            }, 1000);
+        }
+    };
+
+    const disconnectWallet = async () => {
+        try {
+            await disconnect();
+            setProvider(null);
+            setSigner(null);
+            setState(initialState);
+            toast?.("Wallet disconnected", "info");
+        } catch (error) {
+            console.error("Disconnect failed:", error);
+        }
+    };
     const registerEmail = async (email: string) => {
         if (!signer || !state.account) {
             toast?.("Connect wallet first", "error");
@@ -161,76 +168,6 @@ export const usePresale = (toast?: ToastFn) => {
             setState(p => ({ ...p, emailLoading: false }));
         }
     };
-
-    const connectWallet = async () => {
-        // 1. Check if MetaMask (or other injected provider) is present
-        if (!(window as any).ethereum) {
-            // 2. If on mobile and no provider, Deep Link to MetaMask App
-            if (isMobileDevice()) {
-                toast?.("Opening MetaMask...", "info");
-                // Construct the deep link URL (stripping protocol to avoid issues)
-                const host = window.location.host;
-                const path = window.location.pathname;
-                const dappUrl = `${host}${path}`;
-
-                window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
-                return;
-            }
-
-            toast?.("Install MetaMask", "error");
-            return;
-        }
-
-        setState(p => ({ ...p, connecting: true }));
-        try {
-            const switched = await switchNetwork();
-            if (!switched) {
-                setState(p => ({ ...p, connecting: false }));
-                return;
-            }
-
-            const p = new BrowserProvider((window as any).ethereum);
-            const s = await p.getSigner();
-            const a = await s.getAddress();
-
-            setProvider(p);
-            setSigner(s);
-            await refreshData(p, a);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setState(p => ({ ...p, connecting: false }));
-        }
-    };
-
-    const disconnectWallet = () => {
-        setProvider(null);
-        setSigner(null);
-        setState(initialState);
-        toast?.("Wallet disconnected", "info");
-    };
-
-    useEffect(() => {
-        const init = async () => {
-            if ((window as any).ethereum) {
-                const accounts = await (window as any).ethereum.request({ method: 'eth_accounts' });
-                if (accounts.length > 0) connectWallet();
-            }
-        };
-        init();
-
-        if ((window as any).ethereum) {
-            (window as any).ethereum.on('accountsChanged', (accs: string[]) => {
-                if (accs.length > 0) connectWallet();
-                else disconnectWallet();
-            });
-            (window as any).ethereum.on('chainChanged', () => window.location.reload());
-        }
-
-        return () => {
-            (window as any).ethereum?.removeAllListeners();
-        };
-    }, []);
 
     const buyTokens = async (usdtAmount: string, referrer: string, email: string) => {
         if (!isValidAmount(usdtAmount)) {
@@ -254,9 +191,11 @@ export const usePresale = (toast?: ToastFn) => {
             const usdtWei = parseUnits(usdtAmount, 18);
             const ref = referrer?.length === 42 ? referrer : ZeroAddress;
 
-            if ((await usdt.allowance(account, CONFIG.PRESALE_ADDRESS)) < usdtWei) {
+            const allowance = await usdt.allowance(account, CONFIG.PRESALE_ADDRESS);
+            if (allowance < usdtWei) {
                 const txApprove = await usdt.approve(CONFIG.PRESALE_ADDRESS, MaxUint256);
                 await txApprove.wait();
+                toast?.("USDT Approved. Confirming Buy...", "info");
             }
 
             const tx = await presale.buyTokens(dmxWei, ref, email || "");
@@ -265,7 +204,8 @@ export const usePresale = (toast?: ToastFn) => {
             await refreshData(provider, account);
             toast?.("Purchase successful", "success");
         } catch (e: any) {
-            toast?.(e.reason || e.message, "error");
+            console.error(e);
+            toast?.(e.reason || e.message || "Transaction failed", "error");
         } finally {
             setState(p => ({ ...p, loading: false }));
         }
@@ -288,9 +228,11 @@ export const usePresale = (toast?: ToastFn) => {
             const presale = new Contract(CONFIG.PRESALE_ADDRESS, ABIS.PRESALE, signer);
             const dmxWei = parseUnits(dmxAmt, 18);
 
-            if ((await dmx.allowance(account, CONFIG.PRESALE_ADDRESS)) < dmxWei) {
+            const allowance = await dmx.allowance(account, CONFIG.PRESALE_ADDRESS);
+            if (allowance < dmxWei) {
                 const txApprove = await dmx.approve(CONFIG.PRESALE_ADDRESS, dmxWei);
                 await txApprove.wait();
+                toast?.("DMX Approved. Confirming Sell...", "info");
             }
 
             const tx = await presale.sellBack(dmxWei);
@@ -299,7 +241,8 @@ export const usePresale = (toast?: ToastFn) => {
             await refreshData(provider, account);
             toast?.("Tokens sold successfully", "success");
         } catch (e: any) {
-            toast?.(e.reason || e.message, "error");
+            console.error(e);
+            toast?.(e.reason || e.message || "Transaction failed", "error");
         } finally {
             setState(p => ({ ...p, loading: false }));
         }
