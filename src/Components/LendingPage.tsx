@@ -9,7 +9,7 @@ import { isValidEmail } from '../config';
 const Icons = {
     Wallet: () => <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a2 2 0 0 1-2-2V7ad2 2 0 0 1 2-2h3M16 14h.01" /></svg>,
     ArrowDown: () => <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7" /></svg>,
-    Globe: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>,
+    Globe: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1 4-10z" /></svg>,
     Power: () => <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0" /><line x1="12" y1="2" x2="12" y2="12" /></svg>
 };
 
@@ -27,6 +27,7 @@ export default function LendingPage({ toast }: { toast: any }) {
     const isFirstBuy = presale.account && !presale.registeredEmail;
     const isEmailValid =
         !isFirstBuy || isValidEmail(email);
+
     useEffect(() => {
         if (!amount) { setOutput(""); return; }
         const price = parseFloat(presale.currentPrice) || 1;
@@ -44,9 +45,6 @@ export default function LendingPage({ toast }: { toast: any }) {
     const handleAction = () => {
         if (mode === 'BUY') presale.buyTokens(amount, referrer, email || "");
         else presale.sellTokens(amount);
-
-        setAmount("");
-        setOutput("");
     };
     const onAmountChange = (value: string) => {
         if (value === '') {
@@ -76,68 +74,94 @@ export default function LendingPage({ toast }: { toast: any }) {
             <div className="position-relative z-1">
                 <Navbar expand="lg" variant="dark" className="py-3 bg-dark bg-opacity-75 border-bottom border-secondary border-opacity-25 sticky-top backdrop-blur">
                     <Container>
-                        <Navbar.Brand className="d-flex align-items-center gap-2 fw-bold fs-4">
+                        <Navbar.Brand className="d-flex align-items-center gap-2 fw-bold fs-4 me-0" style={{ minWidth: '200px' }}>
                             <img src={LOGO_URL} alt="Dominix" width="40" height="40" className="object-fit-contain" />
                             <span className="text-info tracking-wider">DOMINIX</span>
                         </Navbar.Brand>
+
                         <Navbar.Toggle aria-controls="basic-navbar-nav" />
+
                         <Navbar.Collapse id="basic-navbar-nav">
-                            <Nav className="mx-auto">
+                            <Nav className="mx-auto my-2 my-lg-0">
                                 <Nav.Link href="#" className="text-white mx-3 fw-semibold">Swap</Nav.Link>
                                 <Nav.Link href="#phases" className="text-white-50 mx-3">Phases</Nav.Link>
                                 <Nav.Link href="#tokenomics" className="text-white-50 mx-3">Tokenomics</Nav.Link>
                             </Nav>
 
-                            {!presale.account ? (
-                                <Button
-                                    variant="dark"
-                                    onClick={presale.connectWallet}
-                                    disabled={presale.connecting}
-                                    className="d-flex align-items-center gap-2 rounded-pill px-4 border border-secondary bg-white bg-opacity-10"
-                                >
-                                    {presale.connecting ? (
-                                        <>
-                                            <Spinner animation="border" size="sm" /> Connecting...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Icons.Wallet /> Connect Wallet
-                                        </>
-                                    )}
-                                </Button>
-                            ) : (
-                                <Dropdown>
-                                    <Dropdown.Toggle
+                            <div className="d-flex align-items-center justify-content-lg-end gap-3" style={{ minWidth: '200px' }}>
+                                {!presale.account ? (
+                                    <Button
                                         variant="dark"
-                                        className="d-flex align-items-center gap-2 rounded-pill px-3 py-2 border border-info border-opacity-25 bg-info bg-opacity-10 text-white"
+                                        onClick={presale.connectWallet}
+                                        disabled={presale.connecting}
+                                        className="d-flex align-items-center gap-2 rounded-pill px-4 border border-secondary bg-white bg-opacity-10"
                                     >
-                                        <div className="d-flex align-items-center gap-2">
-                                            <div className="bg-success rounded-circle" style={{ width: 8, height: 8 }}></div>
-                                            <span className="small fw-bold text-info">BSC Mainnet</span>
+                                        {presale.connecting ? (
+                                            <>
+                                                <Spinner animation="border" size="sm" /> Connecting...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Icons.Wallet /> Connect Wallet
+                                            </>
+                                        )}
+                                    </Button>
+                                ) : (
+                                    <div className="d-flex align-items-center gap-3">
+                                        <div className="d-none d-lg-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-black bg-opacity-25 border border-white border-opacity-10">
+                                            <img src={LOGO_URL} width="20" height="20" alt="DMX" />
+                                            <div className="d-flex flex-column lh-1">
+                                                <span className="small text-white-50" style={{ fontSize: '0.65rem' }}>YOUR BALANCE</span>
+                                                <span className="fw-bold text-info small">{parseFloat(presale.dmxBalance).toFixed(2)} DMX</span>
+                                            </div>
                                         </div>
-                                        <div className="vr mx-2 bg-secondary"></div>
-                                        <span className="small fw-bold">{presale.account.substring(0, 6)}...{presale.account.substring(38)}</span>
-                                    </Dropdown.Toggle>
 
-                                    <Dropdown.Menu align="end" className="shadow-lg rounded-4 p-3 bg-dark border border-secondary border-opacity-25" style={{ minWidth: '240px' }}>
-                                        <div className="d-flex align-items-center gap-2 mb-3 px-2">
-                                            <Icons.Globe />
-                                            <span className="small text-white-50">Connected to BNB Testnet</span>
-                                        </div>
-                                        <div className="bg-black bg-opacity-50 rounded-3 p-2 mb-3">
-                                            <div className="d-flex justify-content-between text-secondary small mb-1">
-                                                <span>BNB Balance</span>
-                                            </div>
-                                            <div className="d-flex align-items-center gap-2">
-                                                <span className="fw-bold text-white">{parseFloat(presale.bnbBalance).toFixed(4)} BNB</span>
-                                            </div>
-                                        </div>
-                                        <Dropdown.Item onClick={presale.disconnectWallet} className="text-danger rounded-3 d-flex align-items-center gap-2 hover-bg-secondary">
-                                            <Icons.Power /> Disconnect
-                                        </Dropdown.Item>
-                                    </Dropdown.Menu>
-                                </Dropdown>
-                            )}
+                                        <Dropdown>
+                                            <Dropdown.Toggle
+                                                variant="dark"
+                                                className="d-flex align-items-center gap-2 rounded-pill px-3 py-2 border border-info border-opacity-25 bg-info bg-opacity-10 text-white"
+                                            >
+                                                <div className="d-flex align-items-center gap-2">
+                                                    <div className="bg-success rounded-circle" style={{ width: 8, height: 8 }}></div>
+                                                    <span className="small fw-bold text-info">BSC</span>
+                                                </div>
+                                                <div className="vr mx-2 bg-secondary"></div>
+                                                <span className="small fw-bold">{presale.account.substring(0, 6)}...</span>
+                                            </Dropdown.Toggle>
+
+                                            <Dropdown.Menu align="end" className="shadow-lg rounded-4 p-3 bg-dark border border-secondary border-opacity-25" style={{ minWidth: '260px' }}>
+                                                <div className="d-flex align-items-center gap-2 mb-3 px-2">
+                                                    <Icons.Globe />
+                                                    <span className="small text-white-50">Connected to BSC Mainnet</span>
+                                                </div>
+
+                                                {/* Mobile/Dropdown DMX Display */}
+                                                <div className="bg-info bg-opacity-10 rounded-3 p-2 mb-2 border border-info border-opacity-25">
+                                                    <div className="d-flex justify-content-between text-info small mb-1">
+                                                        <span className="fw-bold">Your Holdings</span>
+                                                    </div>
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <img src={LOGO_URL} width="20" height="20" alt="DMX" />
+                                                        <span className="fw-bold text-white fs-5">{parseFloat(presale.dmxBalance).toFixed(2)} DMX</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="bg-black bg-opacity-50 rounded-3 p-2 mb-3">
+                                                    <div className="d-flex justify-content-between text-secondary small mb-1">
+                                                        <span>BNB Balance</span>
+                                                    </div>
+                                                    <div className="d-flex align-items-center gap-2">
+                                                        <span className="fw-bold text-white">{parseFloat(presale.bnbBalance).toFixed(4)} BNB</span>
+                                                    </div>
+                                                </div>
+                                                <Dropdown.Item onClick={presale.disconnectWallet} className="text-danger rounded-3 d-flex align-items-center gap-2 hover-bg-secondary">
+                                                    <Icons.Power /> Disconnect
+                                                </Dropdown.Item>
+                                            </Dropdown.Menu>
+                                        </Dropdown>
+                                    </div>
+                                )}
+                            </div>
                         </Navbar.Collapse>
                     </Container>
                 </Navbar>

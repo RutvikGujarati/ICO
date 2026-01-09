@@ -49,10 +49,16 @@ const initialState: PresaleState = {
 
 type ToastFn = (msg: string, type?: 'success' | 'error' | 'info') => void;
 
+// Helper to detect mobile devices
+const isMobileDevice = () => {
+    return 'ontouchstart' in window || /iPad|iPhone|iPod|Android/i.test(navigator.userAgent);
+};
+
 export const usePresale = (toast?: ToastFn) => {
     const [provider, setProvider] = useState<BrowserProvider | null>(null);
     const [signer, setSigner] = useState<JsonRpcSigner | null>(null);
     const [state, setState] = useState<PresaleState>(initialState);
+
     const isValidAmount = (value: string) => {
         if (!value) return false;
         if (value === '.' || value === '0.') return false;
@@ -157,13 +163,32 @@ export const usePresale = (toast?: ToastFn) => {
     };
 
     const connectWallet = async () => {
+        // 1. Check if MetaMask (or other injected provider) is present
         if (!(window as any).ethereum) {
+            // 2. If on mobile and no provider, Deep Link to MetaMask App
+            if (isMobileDevice()) {
+                toast?.("Opening MetaMask...", "info");
+                // Construct the deep link URL (stripping protocol to avoid issues)
+                const host = window.location.host;
+                const path = window.location.pathname;
+                const dappUrl = `${host}${path}`;
+
+                window.location.href = `https://metamask.app.link/dapp/${dappUrl}`;
+                return;
+            }
+
             toast?.("Install MetaMask", "error");
             return;
         }
+
         setState(p => ({ ...p, connecting: true }));
         try {
-            await switchNetwork();
+            const switched = await switchNetwork();
+            if (!switched) {
+                setState(p => ({ ...p, connecting: false }));
+                return;
+            }
+
             const p = new BrowserProvider((window as any).ethereum);
             const s = await p.getSigner();
             const a = await s.getAddress();
@@ -230,7 +255,8 @@ export const usePresale = (toast?: ToastFn) => {
             const ref = referrer?.length === 42 ? referrer : ZeroAddress;
 
             if ((await usdt.allowance(account, CONFIG.PRESALE_ADDRESS)) < usdtWei) {
-                await (await usdt.approve(CONFIG.PRESALE_ADDRESS, MaxUint256)).wait();
+                const txApprove = await usdt.approve(CONFIG.PRESALE_ADDRESS, MaxUint256);
+                await txApprove.wait();
             }
 
             const tx = await presale.buyTokens(dmxWei, ref, email || "");
@@ -263,7 +289,8 @@ export const usePresale = (toast?: ToastFn) => {
             const dmxWei = parseUnits(dmxAmt, 18);
 
             if ((await dmx.allowance(account, CONFIG.PRESALE_ADDRESS)) < dmxWei) {
-                await (await dmx.approve(CONFIG.PRESALE_ADDRESS, dmxWei)).wait();
+                const txApprove = await dmx.approve(CONFIG.PRESALE_ADDRESS, dmxWei);
+                await txApprove.wait();
             }
 
             const tx = await presale.sellBack(dmxWei);
